@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT 스토어</title>
+    
+    <!-- Ethers.js -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Pinata 연동 및 NFT 민팅 관련 JS -->
+    <script src="js/nft_minting.js" defer></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { max-width: 800px; margin: auto; }
+        button { padding: 10px; margin-top: 10px; cursor: pointer; }
+        #walletAddress { font-size: 16px; font-weight: bold; color: #007bff; }
+        .hidden { display: none; }
+
+        /* ✅ NFT 목록 스타일 */
+        .nft-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* 자동 크기 조정 */
+            gap: 20px;
+            padding: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ✅ NFT 카드 스타일 */
+        .nft-item {
+            background: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            margin: auto;
+        }
+
+        .nft-item img {
+            width: 100%;
+            height: 200px;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+
+        /* ✅ NFT 버튼 스타일 */
+        .nft-item button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+    </style>
+    
+</head>
+<body>
+
+    <h1>🌟 NFT 민팅 (관리자 전용)</h1>
+
+    <!-- ✅ 로그아웃 버튼 -->
+    <button onclick="logout()" class="btn btn-warning">🚪 로그아웃</button>
+
+    <!-- ✅ 상점 이동 버튼 -->
+    <button id="go-map-store-btn" class="btn btn-secondary">🗺️ 맵 상점으로 이동</button>
+    <button id="go-dice-store-btn" class="btn btn-primary">🎲 주사위 상점으로 이동</button>
+    <button id="go-nft-manage-btn">🖼️ NFT 관리 페이지로 이동</button>
+
+    <!-- ✅ 현재 연결된 지갑 주소 표시 -->
+    <p>🔗 현재 연결된 지갑: <span id="walletAddress">연결 중...</span></p>
+
+    <!-- ✅ NFT 민팅 폼 -->
+    <div class="container">
+        <h3 class="mt-4">🌟 NFT 민팅</h3>
+        
+        <div class="mb-3">
+            <input type="text" class="form-control" id="nftName" placeholder="NFT 이름 입력">
+        </div>
+
+        <div class="mb-3">
+            <textarea class="form-control" id="description" placeholder="NFT 설명 입력"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label for="price" class="form-label">NFT 가격 (GTN)</label>
+            <input type="number" class="form-control" id="price" placeholder="NFT 가격 입력">
+        </div>
+
+        <div class="mb-3">
+            <input type="file" class="form-control" id="upload">
+            <button class="btn btn-primary mt-2" id="uploadButton">📤 이미지 업로드</button>
+        </div>
+
+        <div class="mb-3">
+            <p id="result">IPFS 링크가 여기에 표시됩니다.</p>
+        </div>
+
+        <button class="btn btn-danger" id="mintButton">🌟 NFT 민팅</button>
+ 
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        async function connectWallet() {
+            if (!window.ethereum) {
+                alert("🚨 MetaMask가 설치되어 있지 않습니다!");
+                return;
+            }
+    
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const accounts = await provider.send("eth_requestAccounts", []);
+                const currentAccount = accounts[0];
+    
+                if (!currentAccount) {
+                    alert("🚨 MetaMask 계정을 연결해야 합니다!");
+                    return;
+                }
+    
+                document.getElementById("walletAddress").textContent = currentAccount;
+                window.signer = provider.getSigner();
+                window.currentAccount = currentAccount;
+    
+                console.log(`✅ MetaMask 연결 완료: ${currentAccount}`);
+    
+                // 계정 변경 감지 이벤트 추가
+                window.ethereum.on("accountsChanged", (accounts) => {
+                    if (accounts.length === 0) {
+                        alert("🚨 MetaMask 연결이 해제되었습니다. 다시 로그인하세요.");
+                        localStorage.removeItem("userAccount");
+                        window.location.href = "login.html";
+                    } else {
+                        document.getElementById("walletAddress").textContent = accounts[0];
+                        window.currentAccount = accounts[0];
+                    }
+                });
+    
+            } catch (error) {
+                console.error("🚨 MetaMask 연결 실패:", error);
+            }
+        }
+    
+        // ✅ 로그아웃 함수 추가
+        function logout() {
+            localStorage.removeItem("userAccount");
+            alert("로그아웃 되었습니다.");
+            window.location.href = "login.html";
+        }
+    
+        document.addEventListener("DOMContentLoaded", function () {
+            console.log("📌 [Debug] DOMContentLoaded 실행됨!");
+    
+            // ✅ NFT 조회 버튼 이벤트 추가
+            const viewNFTButton = document.getElementById("viewNFTButton");
+            if (viewNFTButton) {
+                viewNFTButton.addEventListener("click", async function () {
+                    await loadNFTs();
+                });
+            } else {
+                console.warn("⚠️ viewNFTButton 요소를 찾을 수 없습니다.");
+            }
+    
+            // ✅ 맵 상점 이동 버튼
+            const goMapStoreBtn = document.getElementById("go-map-store-btn");
+            if (goMapStoreBtn) {
+                goMapStoreBtn.addEventListener("click", function () {
+                    console.log("🗺️ 맵 상점으로 이동 중...");
+                    window.location.href = "mapstore.html"; // ✅ 맵 상점 페이지로 이동
+                });
+            } else {
+                console.error("🚨 go-map-store-btn 요소를 찾을 수 없습니다!");
+            }
+    
+            // ✅ 주사위 상점 이동 버튼
+            const goDiceStoreBtn = document.getElementById("go-dice-store-btn");
+            if (goDiceStoreBtn) {
+                goDiceStoreBtn.addEventListener("click", function () {
+                    console.log("🎲 주사위 상점으로 이동 중...");
+                    window.location.href = "dice_store.html"; // ✅ 주사위 상점 페이지로 이동
+                });
+            } else {
+                console.error("🚨 go-dice-store-btn 요소를 찾을 수 없습니다!");
+            }
+    
+            // ✅ NFT 관리 페이지 이동 버튼
+            const goNFTManageBtn = document.getElementById("go-nft-manage-btn");
+            if (goNFTManageBtn) {
+                goNFTManageBtn.addEventListener("click", function () {
+                    console.log("🖼️ NFT 관리 페이지로 이동 중...");
+                    window.location.href = "nft_manage.html"; // ✅ NFT 관리 페이지로 이동
+                });
+            } else {
+                console.error("🚨 go-nft-manage-btn 요소를 찾을 수 없습니다!");
+            }
+    
+            // ✅ 페이지 로드 시 지갑 연결 실행
+            connectWallet();
+        });
+    </script>
+
+</body>
+</html>

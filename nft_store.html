@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT 스토어</title>
+
+    <!-- Ethers.js & Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- NFT 스토어 관련 JS -->
+    <script src="js/nft_store.js" defer></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .nft-list { display: flex; flex-wrap: wrap; justify-content: center; }
+        .nft-item { border: 1px solid #ddd; padding: 10px; margin: 10px; width: 250px; }
+        .nft-item img { width: 100%; height: auto; }
+        button { padding: 10px; margin-top: 10px; cursor: pointer; }
+        #walletAddress { font-weight: bold; color: #007bff; }
+        .sold-out { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>🛒 NFT 스토어</h1>
+    <p id="gtnBalance">GTN 잔액: 불러오는 중...</p>
+
+
+    <button onclick="logout()" class="btn btn-warning">🚪 로그아웃</button>
+    <button id="go-nft-manage-btn" class="btn btn-primary" style="display: none;">🖼️ NFT 관리 페이지 이동</button>
+
+    <button id="go-dice-store-btn" class="btn btn-secondary">🎲 주사위 스토어 이동</button>
+    <button id="go-map-store-btn" class="btn btn-secondary">🗺️ 맵 스토어 이동</button>
+
+    <p>🔗 현재 연결된 지갑: <span id="walletAddress">연결 중...</span></p>
+    <button id="connectWalletBtn" class="btn btn-info"></button>
+
+    <h2>📌 판매 중인 NFT 목록</h2>
+    <div class="nft-list" id="nftList"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            document.getElementById("connectWalletBtn").addEventListener("click", async () => {
+                await connectWallet();
+            });
+    
+            document.getElementById("go-nft-manage-btn").addEventListener("click", function () {
+                window.location.href = "nft_manage.html";
+            });
+    
+            document.getElementById("go-dice-store-btn").addEventListener("click", function () {
+                window.location.href = "dice_store.html";
+            });
+    
+            document.getElementById("go-map-store-btn").addEventListener("click", function () {
+                window.location.href = "mapstore.html";
+            });
+    
+            window.onload = async function () {
+                await connectWallet();
+                await checkIfAdmin();  // ✅ 관리자 확인 함수 실행
+                await loadMarketplaceNFTs();
+            };
+        });
+    
+        async function checkIfAdmin() {
+            try {
+                const contract = new ethers.Contract(NFT_CONTRACT_ADDRESS, ABI_NFT, provider);
+                const ownerAddress = await contract.owner();  // 🔹 NFT 컨트랙트 소유자 조회
+                const currentAccount = await signer.getAddress(); // 🔹 현재 연결된 계정
+    
+                if (ownerAddress.toLowerCase() === currentAccount.toLowerCase()) {
+                    document.getElementById("go-nft-manage-btn").style.display = "block"; // ✅ 관리자 계정이면 버튼 표시
+                } else {
+                    document.getElementById("go-nft-manage-btn").style.display = "none";  // ❌ 일반 사용자는 버튼 숨김
+                }
+            } catch (error) {
+                console.error("🚨 관리자 확인 중 오류 발생:", error);
+            }
+        }
+    </script>
+    
+
+</body>
+</html>

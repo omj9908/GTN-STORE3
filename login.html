@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 | 주사위 상점</title>
+
+    <!-- ✅ Bootstrap & Ethers.js -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+</head>
+<body class="bg-light d-flex justify-content-center align-items-center vh-100">
+
+    <div class="card p-4 shadow-lg" style="width: 350px;">
+        <h2 class="text-center">🎲 주사위 상점 로그인</h2>
+        <p class="text-center text-muted">ID, 비밀번호, MetaMask 주소를 입력하세요.</p>
+
+        <!-- ✅ 일반 로그인 폼 -->
+        <div class="mb-3">
+            <label for="username" class="form-label">아이디</label>
+            <input type="text" id="username" class="form-control" placeholder="ID 입력" required>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">비밀번호</label>
+            <input type="password" id="password" class="form-control" placeholder="비밀번호 입력" required>
+        </div>
+        <div class="mb-3">
+            <label for="walletAddress" class="form-label">MetaMask 지갑 주소</label>
+            <input type="text" id="walletAddress" class="form-control" placeholder="MetaMask 지갑 주소 입력" required>
+        </div>
+
+        <!-- ✅ MetaMask 주소 가져오기 버튼 -->
+        <button id="fetchMetaMaskBtn" class="btn btn-secondary w-100 mb-2" onclick="fetchMetaMaskAddress()">🔍 MetaMask 주소 가져오기</button>
+
+        <!-- ✅ 로그인 버튼 -->
+        <button class="btn btn-primary w-100" onclick="loginWithDB()">📌 로그인</button>
+
+        <p class="text-center mt-3">
+            계정이 없나요? <a href="register.html" class="text-decoration-none">회원가입</a>
+        </p>
+    </div>
+
+    <script>
+        async function fetchMetaMaskAddress() {
+            if (!window.ethereum) {
+                alert("🚨 MetaMask가 설치되어 있지 않습니다!");
+                return;
+            }
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const accounts = await provider.send("eth_requestAccounts", []);
+
+                if (accounts.length === 0) {
+                    alert("🚨 MetaMask 계정을 연결해야 합니다!");
+                    return;
+                }
+
+                const metaMaskAddress = ethers.utils.getAddress(accounts[0]); // ✅ 체크섬 변환
+                console.log(`✅ MetaMask에서 가져온 최신 주소: ${metaMaskAddress}`);
+
+                document.getElementById("walletAddress").value = metaMaskAddress;
+                localStorage.setItem("latestMetaMaskAddress", metaMaskAddress);
+
+                alert("✅ MetaMask 주소 연동 완료!");
+
+                // ✅ MetaMask 계정 변경 감지
+                window.ethereum.on("accountsChanged", (newAccounts) => {
+                    if (newAccounts.length > 0) {
+                        const newMetaMaskAddress = ethers.utils.getAddress(newAccounts[0]);
+                        console.log(`🔄 MetaMask 계정 변경 감지: ${newMetaMaskAddress}`);
+                        document.getElementById("walletAddress").value = newMetaMaskAddress;
+                        localStorage.setItem("latestMetaMaskAddress", newMetaMaskAddress);
+                    }
+                });
+
+            } catch (error) {
+                console.error("🚨 MetaMask 주소 가져오기 실패:", error);
+                alert("MetaMask 주소를 가져오는 중 오류가 발생했습니다.");
+            }
+        }
+
+        async function loginWithDB() {
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value.trim();
+            let walletAddress = document.getElementById("walletAddress").value.trim();
+
+            if (!username || !password || !walletAddress) {
+                alert("🚨 아이디, 비밀번호, MetaMask 주소를 모두 입력하세요!");
+                return;
+            }
+
+            try {
+                const storedMetaMaskAddress = localStorage.getItem("latestMetaMaskAddress");
+                if (!storedMetaMaskAddress) {
+                    alert("🚨 MetaMask 주소가 감지되지 않았습니다. MetaMask 연결을 확인하세요.");
+                    return;
+                }
+
+                walletAddress = ethers.utils.getAddress(walletAddress);
+                const formattedStoredAddress = ethers.utils.getAddress(storedMetaMaskAddress);
+
+                if (walletAddress !== formattedStoredAddress) {
+                    alert("❌ 입력한 MetaMask 주소와 현재 MetaMask 주소가 다릅니다!");
+                    return;
+                }
+
+                const response = await fetch("http://localhost:3000/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password, walletAddress })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem("userAccount", walletAddress);
+                    alert("✅ 로그인 성공!");
+                    window.location.href = "homepage.html"; 
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            } catch (error) {
+                console.error("🚨 로그인 실패:", error);
+                alert("로그인 요청 중 오류 발생");
+            }
+        }
+    </script>
+
+</body>
+</html>
